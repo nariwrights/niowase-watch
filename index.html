@@ -52,6 +52,7 @@ button.small{padding:5px 11px;font-size:12px}
 <div class="sub">推し1人の投稿を「貼る／チェックする」→ 文脈を読んで判定する単体ウォッチ。記録はこの端末の中だけに保存されます。文章はキーワードを拾ったあと、仕事・感謝・ファンの文脈で説明できるものを0点に落とします。画像・動画は「本人のものと確認できるか」が必須です。</div>
 
 <div class="card">
+<div class="row" id="profiles" style="margin-bottom:8px"></div>
 <label>推しの名前</label>
 <input type="text" id="name" placeholder="例：推しのA">
 <div class="row" style="margin-top:12px">
@@ -72,6 +73,19 @@ button.small{padding:5px 11px;font-size:12px}
 </div>
 <canvas id="sharecanvas" width="1200" height="630" style="display:none;width:100%;height:auto;border-radius:12px;margin-top:10px"></canvas>
 <div class="mini" id="share-hint" style="margin-top:6px;display:none">Xでシェアを押すと、共有画面（対応端末）から画像つきで投稿できます。非対応の場合は画像を保存して、Xの投稿に添付してください。</div>
+</div>
+
+<div class="card">
+<div class="etitle">プラン</div>
+<div class="row" style="margin-top:6px"><span class="kind" id="plan-status">無料プラン</span></div>
+<div class="mini" id="plan-usage" style="margin-top:6px"></div>
+<div class="mini" style="margin-top:6px">有料プラン（月300円・申込は準備中）：判定は無制限、推しは5人まで、履歴は全期間、画像・動画の詳細判定と繰り返し検出がすべて使えます。</div>
+<div id="unlock-box">
+<label>解錠コード（お持ちの方）</label>
+<input type="text" id="unlock-code" placeholder="例：NW-XXXX-0000">
+<div class="row" style="margin-top:8px"><button class="small" id="unlock-btn">コードで解放する</button></div>
+<div class="mini" id="plan-msg" style="margin-top:6px"></div>
+</div>
 </div>
 
 <div class="card">
@@ -177,41 +191,57 @@ CHECKS.forEach(function(c){if(sel[c.key]){hits.push({label:c.label,pts:c.pts,adj
 return {hits:hits,score:Math.min(100,total)};
 }
 var KEY="niowaseWatchV5";
-var S={name:"",entries:[]};
-try{var saved=localStorage.getItem(KEY);if(saved)S=JSON.parse(saved);}catch(e){}
+var S={profiles:[{name:"",entries:[]}],active:0,premium:false,usage:{}};
+try{var saved=localStorage.getItem(KEY);if(saved){var sv=JSON.parse(saved);
+if(sv&&sv.profiles){S=sv;}
+else if(sv&&(sv.entries||sv.name!==undefined)){S.profiles=[{name:sv.name||"",entries:sv.entries||[]}];}
+}}catch(e){}
+if(!S.profiles||!S.profiles.length)S.profiles=[{name:"",entries:[]}];
+if(typeof S.active!=="number"||S.active<0||S.active>=S.profiles.length)S.active=0;
+if(!S.usage)S.usage={};
+S.profiles.forEach(function(p){(p.entries||[]).forEach(function(e){if(!e.ts)e.ts=Date.now();});});
+function P(){return S.profiles[S.active];}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}render();}
+function monthKey(){var d=new Date();return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2);}
+function usedThisMonth(){return S.usage[monthKey()]||0;}
+function visEntries(){var all=P().entries;if(S.premium)return all;var cut=Date.now()-7*24*60*60*1000;return all.filter(function(e){return (e.ts||0)>=cut;});}
+function lockedCount(){return P().entries.length-visEntries().length;}
 function overall(){
-var sc=S.entries.map(function(e){return e.score;}).sort(function(a,b){return b-a;});
+var sc=visEntries().map(function(e){return e.score;}).sort(function(a,b){return b-a;});
 var top=sc.slice(0,3);var avg=top.length?top.reduce(function(a,b){return a+b;},0)/top.length:0;
 var strong=sc.filter(function(x){return x>=25;}).length;
 var bonus=strong>=2?Math.min(30,(strong-1)*10):0;
 return Math.round(avg*0.8+bonus);
 }
-function verdict(g){if(!S.entries.length)return "まだ材料がありません";if(g>=60)return "強めの気配。痕跡型の一致が複数あります";if(g>=35)return "少し気になる材料あり";if(g>=10)return "気のせいレベル";return "平和。兆候は見つかっていません";}
+function verdict(g){if(!visEntries().length)return "まだ材料がありません";if(g>=60)return "強めの気配。痕跡型の一致が複数あります";if(g>=35)return "少し気になる材料あり";if(g>=10)return "気のせいレベル";return "平和。兆候は見つかっていません";}
 function repeats(){
 var count={},order=[];
-S.entries.forEach(function(e){var seen={};e.hits.forEach(function(h){if(h.adj>0&&!seen[h.label]){seen[h.label]=1;count[h.label]=(count[h.label]||0)+1;if(count[h.label]===2)order.push(h.label);}});});
+visEntries().forEach(function(e){var seen={};e.hits.forEach(function(h){if(h.adj>0&&!seen[h.label]){seen[h.label]=1;count[h.label]=(count[h.label]||0)+1;if(count[h.label]===2)order.push(h.label);}});});
 return order;
 }
 function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
 function render(){
-document.getElementById("name").value=S.name||"";
+document.getElementById("name").value=P().name||"";
+renderProfiles();renderPlan();
 var g=overall();document.getElementById("gauge").textContent=g;
 document.getElementById("barfill").style.width=g+"%";
 document.getElementById("verdict").textContent=verdict(g);
 var al=repeats();
 document.getElementById("alerts").innerHTML=al.map(function(l){return '<div class="alert">繰り返し検出：「'+esc(l)+'」が複数の材料に出ています</div>';}).join("");
 var box=document.getElementById("entries");
-if(!S.entries.length){box.innerHTML='<div class="mini">材料はまだありません。上のタブから追加するか、サンプルを押してみてください。</div>';return;}
-box.innerHTML=S.entries.map(function(e,i){
+if(!P().entries.length){box.innerHTML='<div class="mini">材料はまだありません。上のタブから追加するか、サンプルを押してみてください。</div>';return;}
+box.innerHTML=visEntries().map(function(e,i){
 var kind=e.kind==="text"?"文章":(e.kind==="image"?"画像":"動画");
-var hits=e.hits.map(function(h){
+var hs=e.hits,lockNote="";
+if(!S.premium&&e.kind!=="text"&&hs.length>1){lockNote='<div class="hit"><span class="reason">ほか'+(hs.length-1)+'件の詳細は有料プランで表示</span></div>';hs=hs.slice(0,1);}
+var hits=hs.map(function(h){
 if(h.adj===0&&h.pts>0)return '<div class="hit"><span class="zero">'+esc(h.label)+" +"+h.pts+'</span> <span class="reason">→ 0点（'+esc(h.reason||"文脈で説明できる")+'）</span></div>';
 return '<div class="hit">'+esc(h.label)+" +"+h.adj+(h.reason?' <span class="reason">'+esc(h.reason)+'</span>':"")+'</div>';
 }).join("");
-return '<div class="entry"><div class="row" style="justify-content:space-between"><span class="etitle">'+esc(e.date||"日付なし")+" "+esc(e.title||"")+'</span><span><span class="kind">'+kind+'</span> <span class="escore">'+e.score+'点</span> <button class="small" data-del="'+i+'">削除</button></span></div>'+(e.text?'<div class="mini" style="margin-top:4px">'+esc(e.text.slice(0,120))+(e.text.length>120?"…":"")+'</div>':"")+hits+'</div>';
+return '<div class="entry"><div class="row" style="justify-content:space-between"><span class="etitle">'+esc(e.date||"日付なし")+" "+esc(e.title||"")+'</span><span><span class="kind">'+kind+'</span> <span class="escore">'+e.score+'点</span> <button class="small" data-del="'+P().entries.indexOf(e)+'">削除</button></span></div>' +(e.text?'<div class="mini" style="margin-top:4px">'+esc(e.text.slice(0,120))+(e.text.length>120?"…":"")+'</div>':"")+hits+lockNote+'</div>';
 }).join("");
-box.querySelectorAll("[data-del]").forEach(function(b){b.addEventListener("click",function(){S.entries.splice(parseInt(b.getAttribute("data-del"),10),1);save();});});
+if(lockedCount()>0){box.innerHTML+='<div class="alert">7日より前の履歴が'+lockedCount()+'件あります。有料プランで表示され、気配度にも反映されます（記録自体は消えていません）。</div>';}
+box.querySelectorAll("[data-del]").forEach(function(b){b.addEventListener("click",function(){P().entries.splice(parseInt(b.getAttribute("data-del"),10),1);save();});});
 }
 function buildChecks(id){
 document.getElementById(id).innerHTML=CHECKS.map(function(c){return '<label class="check"><input type="checkbox" data-k="'+c.key+'"><span>'+c.label+"（+"+c.pts+'）</span></label>';}).join("");
@@ -224,17 +254,19 @@ document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click"
 document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("on");});t.classList.add("on");
 ["text","image","video"].forEach(function(k){document.getElementById("pane-"+k).style.display=(k===t.getAttribute("data-tab"))?"block":"none";});
 });});
-document.getElementById("name").addEventListener("change",function(e){S.name=e.target.value;save();});
+document.getElementById("name").addEventListener("change",function(e){P().name=e.target.value;save();});
 document.getElementById("add-text").addEventListener("click",function(){
 var text=document.getElementById("t-text").value.trim();if(!text){alert("本文を入れてください");return;}
+if(!S.premium&&usedThisMonth()>=10){alert("無料プランの文章判定は月10回までです。有料プラン（月300円・申込は準備中）で無制限になります。解錠コードをお持ちの方はプラン欄から解放できます。");return;}
 var r=scoreText(text);
-S.entries.push({kind:"text",date:document.getElementById("t-date").value,title:document.getElementById("t-title").value,text:text,hits:r.hits,score:r.score});
+S.usage[monthKey()]=usedThisMonth()+1;
+P().entries.push({kind:"text",date:document.getElementById("t-date").value,title:document.getElementById("t-title").value,text:text,hits:r.hits,score:r.score,ts:Date.now()});
 document.getElementById("t-text").value="";document.getElementById("t-title").value="";save();
 });
 document.getElementById("add-image").addEventListener("click",function(){
 var r=scoreChecks(readChecks("i-checks"),document.getElementById("i-self").checked);
 if(!r.hits.length){alert("チェックを1つ以上入れてください");return;}
-S.entries.push({kind:"image",date:document.getElementById("i-date").value,title:document.getElementById("i-title").value,text:"",hits:r.hits,score:r.score});save();
+P().entries.push({kind:"image",date:document.getElementById("i-date").value,title:document.getElementById("i-title").value,text:"",hits:r.hits,score:r.score,ts:Date.now()});save();
 });
 document.getElementById("add-video").addEventListener("click",function(){
 var r=scoreChecks(readChecks("v-checks"),document.getElementById("v-self").checked);
@@ -242,30 +274,30 @@ var text=document.getElementById("v-text").value.trim();var th=null,ts=0;
 if(text){th=scoreText(text);ts=th.score;}
 var hits=r.hits.concat(th?th.hits:[]);
 if(!hits.length){alert("チェックかセリフを入れてください");return;}
-S.entries.push({kind:"video",date:document.getElementById("v-date").value,title:document.getElementById("v-title").value,text:text,hits:hits,score:Math.min(100,r.score+ts)});save();
+P().entries.push({kind:"video",date:document.getElementById("v-date").value,title:document.getElementById("v-title").value,text:text,hits:hits,score:Math.min(100,r.score+ts),ts:Date.now()});save();
 });
 function preset(n){
-if(n===1){S.name=S.name||"推しのA";S.entries=[
+if(n===1){P().name=P().name||"推しのA";P().entries=[
 {kind:"text",date:"2026-09-01",title:"サンプル：応援の話（実例をもとにした要約）",text:"オーディションを受けるみなさんへ。緊張したら、友達からもらったお揃いキーホルダーを握ってみて。応援しています！",hits:[],score:0},
 {kind:"text",date:"2026-08-13",title:"サンプル：CMの話（実例をもとにした要約）",text:"マクドナルドのCMに出演させていただきました！ずっと夢だったので本当に幸せです。",hits:[],score:0}];
-S.entries.forEach(function(e){var r=scoreText(e.text);e.hits=r.hits;e.score=r.score;});}
-if(n===2){S.name=S.name||"推しのA";var t="昨日の夜ごはん。テーブルに二人分の食器を並べて、指輪がキラッと光った気がした。大切な人と過ごす時間は幸せだなあ。";var r=scoreText(t);S.entries=[{kind:"text",date:today(),title:"サンプル：痕跡型",text:t,hits:r.hits,score:r.score}];}
-if(n===3){S.name=S.name||"推しのA";var ri=scoreChecks({two:true,reflect:true},true);var rv=scoreChecks({ring:true},true);var rt=scoreText("休日に出かけた日の動画。大切な人との思い出を少しだけ。");
-S.entries=[{kind:"image",date:today(),title:"サンプル：ブログ写真",text:"",hits:ri.hits,score:ri.score},
-{kind:"video",date:today(),title:"サンプル：オフショット動画",text:"休日に出かけた日の動画",hits:rv.hits.concat(rt.hits),score:Math.min(100,rv.score+rt.score)}];}
+P().entries.forEach(function(e){var r=scoreText(e.text);e.hits=r.hits;e.score=r.score;e.ts=Date.now();});}
+if(n===2){P().name=P().name||"推しのA";var t="昨日の夜ごはん。テーブルに二人分の食器を並べて、指輪がキラッと光った気がした。大切な人と過ごす時間は幸せだなあ。";var r=scoreText(t);P().entries=[{kind:"text",date:today(),title:"サンプル：痕跡型",text:t,hits:r.hits,score:r.score,ts:Date.now()}];}
+if(n===3){P().name=P().name||"推しのA";var ri=scoreChecks({two:true,reflect:true},true);var rv=scoreChecks({ring:true},true);var rt=scoreText("休日に出かけた日の動画。大切な人との思い出を少しだけ。");
+P().entries=[{kind:"image",date:today(),title:"サンプル：ブログ写真",text:"",hits:ri.hits,score:ri.score,ts:Date.now()},
+{kind:"video",date:today(),title:"サンプル：オフショット動画",text:"休日に出かけた日の動画",hits:rv.hits.concat(rt.hits),score:Math.min(100,rv.score+rt.score),ts:Date.now()}];}
 save();
 }
 document.getElementById("p1").addEventListener("click",function(){preset(1);});
 document.getElementById("p2").addEventListener("click",function(){preset(2);});
 document.getElementById("p3").addEventListener("click",function(){preset(3);});
-document.getElementById("clear").addEventListener("click",function(){S.entries=[];save();});
+document.getElementById("clear").addEventListener("click",function(){P().entries=[];save();});
 document.getElementById("report").addEventListener("click",function(){
-var g=overall(),name=S.name||"推し";
-var strong=S.entries.filter(function(e){return e.score>=25;});
+var g=overall(),name=P().name||"推し";
+var strong=visEntries().filter(function(e){return e.score>=25;});
 var rep=repeats();
 var lines=[];
-if(g<10&&!strong.length){lines.push(""+name+"：直近の材料"+S.entries.length+"件を確認し、強い兆候は見つかりませんでした（気配度 "+g+"/100）。文脈判定で除外されたヒットも含め、平和です。※公開範囲で見つからなかったという意味で、絶対の証明ではありません。");}
-else{lines.push(""+name+"：気配度 "+g+"/100（材料"+S.entries.length+"件）");
+if(g<10&&!strong.length){lines.push(""+name+"：直近の材料"+visEntries().length+"件を確認し、強い兆候は見つかりませんでした（気配度 "+g+"/100）。文脈判定で除外されたヒットも含め、平和です。※公開範囲で見つからなかったという意味で、絶対の証明ではありません。");}
+else{lines.push(""+name+"：気配度 "+g+"/100（材料"+visEntries().length+"件）");
 strong.forEach(function(e){lines.push("・"+(e.date||"")+" "+(e.title||"")+"："+e.score+"点（"+e.hits.filter(function(h){return h.adj>0;}).map(function(h){return h.label;}).join("、")+"）");});
 if(rep.length)lines.push("繰り返し："+rep.join("、"));
 lines.push("※エンタメ診断であり、交際の断定ではありません。");}
@@ -275,18 +307,18 @@ document.getElementById("copy").addEventListener("click",function(){var o=docume
 var APP_URL="https://nariwrights.github.io/niowase-watch/";
 function topHits(){
 var count={};
-S.entries.forEach(function(e){var seen={};e.hits.forEach(function(h){if(h.adj>0&&!seen[h.label]){seen[h.label]=1;count[h.label]=(count[h.label]||0)+1;}});});
+visEntries().forEach(function(e){var seen={};e.hits.forEach(function(h){if(h.adj>0&&!seen[h.label]){seen[h.label]=1;count[h.label]=(count[h.label]||0)+1;}});});
 return Object.keys(count).sort(function(a,b){return count[b]-count[a];}).slice(0,3);
 }
 function shareComment(g){
-if(!S.entries.length)return "まだ材料がありません";
+if(!visEntries().length)return "まだ材料がありません";
 if(g>=60)return "強めの気配…!? 痕跡型の一致が複数あります";
 if(g>=35)return "少し気になる材料あり。様子見がおすすめ";
 if(g>=10)return "気のせいレベル。ほぼ平和です";
 return "今日も推しは平和でした";
 }
 function shareText(){
-var g=overall();var name=document.getElementById("share-name").checked?(S.name||"推し"):"推し";
+var g=overall();var name=document.getElementById("share-name").checked?(P().name||"推し"):"推し";
 var hits=topHits();
 var t="【匂わせウォッチ】"+name+"の気配度は "+g+"/100 でした。"+shareComment(g);
 if(hits.length)t+="（気になった要素："+hits.join("、")+"）";
@@ -296,7 +328,7 @@ return t;
 function drawCard(){
 var cv=document.getElementById("sharecanvas"),ctx=cv.getContext("2d");
 var g=overall(),showName=document.getElementById("share-name").checked;
-var name=showName?(S.name||"推し"):"推し";
+var name=showName?(P().name||"推し"):"推し";
 var grad=ctx.createLinearGradient(0,0,1200,630);grad.addColorStop(0,"#7c5cbf");grad.addColorStop(1,"#4b3577");
 ctx.fillStyle=grad;ctx.fillRect(0,0,1200,630);
 ctx.fillStyle="rgba(255,255,255,0.14)";ctx.beginPath();ctx.arc(1060,80,190,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(90,590,150,0,Math.PI*2);ctx.fill();
@@ -309,7 +341,7 @@ ctx.font="700 170px sans-serif";var gw=ctx.measureText(String(g)).width;ctx.fill
 ctx.font="700 44px sans-serif";ctx.fillText("/ 100",84+gw,420);
 ctx.font="700 40px sans-serif";ctx.fillText(shareComment(g),64,492);
 var hits=topHits();ctx.font="28px sans-serif";ctx.fillStyle="rgba(255,255,255,0.9)";
-ctx.fillText(hits.length?("気になった要素："+hits.join("、")):"気になった要素：なし（材料 "+S.entries.length+" 件を確認）",64,540);
+ctx.fillText(hits.length?("気になった要素："+hits.join("、")):"気になった要素：なし（材料 "+visEntries().length+" 件を確認）",64,540);
 ctx.font="24px sans-serif";ctx.fillStyle="rgba(255,255,255,0.75)";
 ctx.fillText("エンタメ診断です。交際の断定ではありません。",64,584);
 ctx.textAlign="right";ctx.fillText("nariwrights.github.io/niowase-watch",1136,584);ctx.textAlign="left";
@@ -336,6 +368,37 @@ window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text),"_
 }else{
 window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text),"_blank");
 }
+});
+function renderProfiles(){
+var el=document.getElementById("profiles");if(!el)return;
+var html=S.profiles.map(function(p,i){return '<button class="small" data-prof="'+i+'" style="'+(i===S.active?"background:#7c5cbf;color:#fff;border-color:#7c5cbf;font-weight:600":"")+'">'+esc(p.name||("推し"+(i+1)))+'</button>';}).join("");
+html+='<button class="small" id="add-prof">＋ 推しを追加</button>';
+if(S.profiles.length>1)html+='<button class="small" id="del-prof">今の推しを削除</button>';
+el.innerHTML=html;
+el.querySelectorAll("[data-prof]").forEach(function(b){b.addEventListener("click",function(){S.active=parseInt(b.getAttribute("data-prof"),10);save();});});
+var ab=document.getElementById("add-prof");
+if(ab)ab.addEventListener("click",function(){
+if(!S.premium&&S.profiles.length>=1){alert("無料プランは推し1人までです。有料プラン（月300円・申込は準備中）で5人まで登録できます。");return;}
+if(S.profiles.length>=5){alert("登録できる推しは5人までです");return;}
+var n=prompt("推しの名前","");if(n===null)return;
+S.profiles.push({name:n,entries:[]});S.active=S.profiles.length-1;save();
+});
+var db=document.getElementById("del-prof");
+if(db)db.addEventListener("click",function(){if(confirm("今表示している推しの記録を削除しますか？")){S.profiles.splice(S.active,1);S.active=0;save();}});
+}
+function renderPlan(){
+var st=document.getElementById("plan-status");if(!st)return;
+st.textContent=S.premium?"有料プラン（解放済み）":"無料プラン";
+var u=document.getElementById("plan-usage");
+if(u)u.textContent=S.premium?("文章判定：無制限／推し："+S.profiles.length+"人（最大5）／履歴：全期間／画像・動画の詳細：全部表示"):("文章判定：今月 "+usedThisMonth()+" / 10 回／推し：1人まで／履歴：直近7日／画像・動画の詳細：1件まで");
+var ub=document.getElementById("unlock-box");if(ub)ub.style.display=S.premium?"none":"";
+}
+document.getElementById("unlock-btn").addEventListener("click",function(){
+var v=document.getElementById("unlock-code").value.trim().toUpperCase();
+var h=5381;for(var i=0;i<v.length;i++){h=((h<<5)+h+v.charCodeAt(i))>>>0;}
+var m=document.getElementById("plan-msg");
+if(h===3994473642){S.premium=true;save();m.textContent="有料プランを解放しました。ありがとうございます！";}
+else{m.textContent="コードが違います。";}
 });
 render();
 if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(function(){});}
