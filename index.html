@@ -44,6 +44,8 @@ button.small{padding:5px 11px;font-size:12px}
 .kind{font-size:11px;border:1px solid #d8d2e8;border-radius:999px;padding:1px 8px;color:#6f6a7d}
 .alert{background:#f3effa;border-radius:8px;padding:8px 10px;font-size:13px;margin-top:6px}
 .mini{font-size:11px;color:#6f6a7d;line-height:1.6}
+.drop{border:2px dashed #b7a6dd;border-radius:12px;padding:18px 10px;text-align:center;font-size:13px;color:#7c5cbf;background:#f3effa;cursor:pointer;margin-top:10px}
+.drop.over{background:#e7ddf7}
 </style>
 </head>
 <body>
@@ -103,6 +105,12 @@ button.small{padding:5px 11px;font-size:12px}
 <div id="pane-image" style="display:none">
 <label>日付</label><input type="date" id="i-date">
 <label>メモ（任意）</label><input type="text" id="i-title" placeholder="例：ブログ写真3枚目">
+<div class="drop" id="i-drop">スクショをここにポイッと入れる<br><span style="font-size:11px">タップで写真を選ぶ／PCはドラッグ＆ドロップ／コピペもOK</span></div>
+<input type="file" id="i-file" accept="image/*" style="display:none">
+<img id="i-preview" style="display:none;width:100%;border-radius:10px;margin-top:8px">
+<div class="row" style="margin-top:6px"><button class="small" id="i-paste">クリップボードから貼り付け</button><button class="small" id="i-img-clear" style="display:none">画像を外す</button></div>
+<div class="mini" id="i-img-status" style="margin-top:4px"></div>
+<div class="mini" style="margin-top:4px">画像を見ながら下の項目をチェックしてください。自動で断定はしません（他人の指輪や衣装のお揃いは誤判定のもとになるため）。</div>
 <div class="checks" id="i-checks"></div>
 <label style="margin-top:10px"><input type="checkbox" id="i-self"> 写っているのは本人／本人のものと確認できる</label>
 <div class="row" style="margin-top:8px"><button class="primary" id="add-image">画像チェックを追加</button></div>
@@ -201,7 +209,12 @@ if(typeof S.active!=="number"||S.active<0||S.active>=S.profiles.length)S.active=
 if(!S.usage)S.usage={};
 S.profiles.forEach(function(p){(p.entries||[]).forEach(function(e){if(!e.ts)e.ts=Date.now();});});
 function P(){return S.profiles[S.active];}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}render();}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){
+var stripped=false;
+S.profiles.forEach(function(p){p.entries.forEach(function(en){if(en.img){en.img="";stripped=true;}});});
+try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e2){}
+if(stripped)alert("保存容量がいっぱいになったため、画像なしで保存しました（判定の記録は保存されています）。");
+}render();}
 function monthKey(){var d=new Date();return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2);}
 function usedThisMonth(){return S.usage[monthKey()]||0;}
 function visEntries(){var all=P().entries;if(S.premium)return all;var cut=Date.now()-7*24*60*60*1000;return all.filter(function(e){return (e.ts||0)>=cut;});}
@@ -238,7 +251,7 @@ var hits=hs.map(function(h){
 if(h.adj===0&&h.pts>0)return '<div class="hit"><span class="zero">'+esc(h.label)+" +"+h.pts+'</span> <span class="reason">→ 0点（'+esc(h.reason||"文脈で説明できる")+'）</span></div>';
 return '<div class="hit">'+esc(h.label)+" +"+h.adj+(h.reason?' <span class="reason">'+esc(h.reason)+'</span>':"")+'</div>';
 }).join("");
-return '<div class="entry"><div class="row" style="justify-content:space-between"><span class="etitle">'+esc(e.date||"日付なし")+" "+esc(e.title||"")+'</span><span><span class="kind">'+kind+'</span> <span class="escore">'+e.score+'点</span> <button class="small" data-del="'+P().entries.indexOf(e)+'">削除</button></span></div>' +(e.text?'<div class="mini" style="margin-top:4px">'+esc(e.text.slice(0,120))+(e.text.length>120?"…":"")+'</div>':"")+hits+lockNote+'</div>';
+return '<div class="entry"><div class="row" style="justify-content:space-between"><span class="etitle">'+esc(e.date||"日付なし")+" "+esc(e.title||"")+'</span><span><span class="kind">'+kind+'</span> <span class="escore">'+e.score+'点</span> <button class="small" data-del="'+P().entries.indexOf(e)+'">削除</button></span></div>'+(e.img?'<img src="'+e.img+'" style="width:100%;border-radius:10px;margin-top:6px">':"")+(e.text?'<div class="mini" style="margin-top:4px">'+esc(e.text.slice(0,120))+(e.text.length>120?"…":"")+'</div>':"")+hits+lockNote+'</div>';
 }).join("");
 if(lockedCount()>0){box.innerHTML+='<div class="alert">7日より前の履歴が'+lockedCount()+'件あります。有料プランで表示され、気配度にも反映されます（記録自体は消えていません）。</div>';}
 box.querySelectorAll("[data-del]").forEach(function(b){b.addEventListener("click",function(){P().entries.splice(parseInt(b.getAttribute("data-del"),10),1);save();});});
@@ -263,10 +276,40 @@ S.usage[monthKey()]=usedThisMonth()+1;
 P().entries.push({kind:"text",date:document.getElementById("t-date").value,title:document.getElementById("t-title").value,text:text,hits:r.hits,score:r.score,ts:Date.now()});
 document.getElementById("t-text").value="";document.getElementById("t-title").value="";save();
 });
+var pendingImage=null;
+function setPendingImage(url){pendingImage=url;var im=document.getElementById("i-preview");im.src=url;im.style.display="block";document.getElementById("i-img-clear").style.display="";document.getElementById("i-img-status").textContent="画像を読み込みました。見ながらチェックして「画像チェックを追加」を押してください。";}
+function clearPendingImage(){pendingImage=null;var im=document.getElementById("i-preview");im.src="";im.style.display="none";document.getElementById("i-img-clear").style.display="none";document.getElementById("i-img-status").textContent="";}
+function loadImageFile(file){
+if(!file||(file.type&&file.type.indexOf("image")!==0)){alert("画像ファイルを選んでください");return;}
+var rd=new FileReader();
+rd.onload=function(){var img=new Image();img.onload=function(){var sc=Math.min(1,640/Math.max(img.width,img.height));var cv=document.createElement("canvas");cv.width=Math.max(1,Math.round(img.width*sc));cv.height=Math.max(1,Math.round(img.height*sc));cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);setPendingImage(cv.toDataURL("image/jpeg",0.72));};img.src=rd.result;};
+rd.readAsDataURL(file);
+}
+document.getElementById("i-drop").addEventListener("click",function(){document.getElementById("i-file").click();});
+document.getElementById("i-file").addEventListener("change",function(e){if(e.target.files&&e.target.files[0])loadImageFile(e.target.files[0]);});
+var dropEl=document.getElementById("i-drop");
+dropEl.addEventListener("dragover",function(e){e.preventDefault();dropEl.classList.add("over");});
+dropEl.addEventListener("dragleave",function(){dropEl.classList.remove("over");});
+dropEl.addEventListener("drop",function(e){e.preventDefault();dropEl.classList.remove("over");if(e.dataTransfer.files&&e.dataTransfer.files[0])loadImageFile(e.dataTransfer.files[0]);});
+document.getElementById("i-img-clear").addEventListener("click",clearPendingImage);
+document.getElementById("i-paste").addEventListener("click",function(){
+if(!navigator.clipboard||!navigator.clipboard.read){alert("この端末ではボタンからの貼り付けが使えません。写真を選ぶか、PCなら Ctrl+V で貼り付けできます");return;}
+navigator.clipboard.read().then(function(items){
+for(var i=0;i<items.length;i++){var types=items[i].types.filter(function(t){return t.indexOf("image")===0;});
+if(types.length){items[i].getType(types[0]).then(function(blob){loadImageFile(blob);});return;}}
+alert("クリップボードに画像がありませんでした");
+}).catch(function(){alert("クリップボードを読めませんでした。写真を選ぶ方法を試してください");});
+});
+document.addEventListener("paste",function(e){
+var items=(e.clipboardData||{}).items||[];
+for(var i=0;i<items.length;i++){if(items[i].type&&items[i].type.indexOf("image")===0){loadImageFile(items[i].getAsFile());
+document.querySelectorAll(".tab").forEach(function(t){if(t.getAttribute("data-tab")==="image")t.click();});
+break;}}
+});
 document.getElementById("add-image").addEventListener("click",function(){
 var r=scoreChecks(readChecks("i-checks"),document.getElementById("i-self").checked);
 if(!r.hits.length){alert("チェックを1つ以上入れてください");return;}
-P().entries.push({kind:"image",date:document.getElementById("i-date").value,title:document.getElementById("i-title").value,text:"",hits:r.hits,score:r.score,ts:Date.now()});save();
+P().entries.push({kind:"image",date:document.getElementById("i-date").value,title:document.getElementById("i-title").value,text:"",hits:r.hits,score:r.score,ts:Date.now(),img:pendingImage||""});clearPendingImage();save();
 });
 document.getElementById("add-video").addEventListener("click",function(){
 var r=scoreChecks(readChecks("v-checks"),document.getElementById("v-self").checked);
