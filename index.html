@@ -44,8 +44,11 @@ button.small{padding:5px 11px;font-size:12px}
 .kind{font-size:11px;border:1px solid #d8d2e8;border-radius:999px;padding:1px 8px;color:#6f6a7d}
 .alert{background:#f3effa;border-radius:8px;padding:8px 10px;font-size:13px;margin-top:6px}
 .mini{font-size:11px;color:#6f6a7d;line-height:1.6}
-.drop{border:2px dashed #b7a6dd;border-radius:12px;padding:18px 10px;text-align:center;font-size:13px;color:#7c5cbf;background:#f3effa;cursor:pointer;margin-top:10px}
-.drop.over{background:#e7ddf7}
+.drop{border:3px dashed #7c5cbf;border-radius:14px;padding:28px 12px;text-align:center;font-size:17px;font-weight:700;color:#4b3577;background:linear-gradient(180deg,#efe8fc,#e0d2f7);cursor:pointer;margin:4px 0 10px}
+.drop small{font-size:12px;font-weight:400;color:#6f6a7d}
+.drop.over{background:#d5c3f5}
+.drop.flash{animation:flash 1s ease 2}
+@keyframes flash{0%,100%{box-shadow:0 0 0 0 rgba(124,92,191,0)}50%{box-shadow:0 0 0 6px rgba(124,92,191,.45)}}
 </style>
 </head>
 <body>
@@ -63,6 +66,8 @@ button.small{padding:5px 11px;font-size:12px}
 </div>
 <div id="alerts"></div>
 </div>
+
+<button class="primary" id="goto-image" style="width:100%;padding:16px;font-size:16px;margin-bottom:10px">📷 スクショを入れて判定する</button>
 
 <div class="card">
 <div class="etitle">判定結果カード（シェア用）</div>
@@ -103,9 +108,9 @@ button.small{padding:5px 11px;font-size:12px}
 <div class="row" style="margin-top:10px"><button class="primary" id="add-text">文章を判定して追加</button></div>
 </div>
 <div id="pane-image" style="display:none">
+<div class="drop" id="i-drop">📷 スクショをここにポイッと入れる<br><small>タップで写真を選ぶ／PCはドラッグ＆ドロップ／コピペもOK</small></div>
 <label>日付</label><input type="date" id="i-date">
 <label>メモ（任意）</label><input type="text" id="i-title" placeholder="例：ブログ写真3枚目">
-<div class="drop" id="i-drop">スクショをここにポイッと入れる<br><span style="font-size:11px">タップで写真を選ぶ／PCはドラッグ＆ドロップ／コピペもOK</span></div>
 <input type="file" id="i-file" accept="image/*" style="display:none">
 <img id="i-preview" style="display:none;width:100%;border-radius:10px;margin-top:8px">
 <div class="row" style="margin-top:6px"><button class="small" id="i-paste">クリップボードから貼り付け</button><button class="small" id="i-img-clear" style="display:none">画像を外す</button></div>
@@ -141,6 +146,7 @@ button.small{padding:5px 11px;font-size:12px}
 <textarea id="out" style="margin-top:10px;min-height:110px" placeholder="ここにまとめが出ます"></textarea>
 <div class="mini" style="margin-top:6px">判定はエンタメ診断です。「何も出なかった」は公開範囲で見つからなかったという意味で、絶対の証明ではありません。実在の人の交際を断定するものではありません。</div>
 </div>
+<div class="mini" style="text-align:center;margin-top:4px">匂わせウォッチ v5（スクショ導線つき）</div>
 </div>
 <script>
 var SIGNS=[
@@ -411,6 +417,11 @@ window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text),"_
 }else{
 window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text),"_blank");
 }
+});
+document.getElementById("goto-image").addEventListener("click",function(){
+document.querySelectorAll(".tab").forEach(function(t){if(t.getAttribute("data-tab")==="image")t.click();});
+var d=document.getElementById("i-drop");
+if(d){if(d.scrollIntoView)d.scrollIntoView({behavior:"smooth",block:"center"});d.classList.remove("flash");void d.offsetWidth;d.classList.add("flash");}
 });
 function renderProfiles(){
 var el=document.getElementById("profiles");if(!el)return;
