@@ -1,0 +1,1 @@
+{"background_color":"#f6f3fb","description":"推し1人の投稿を貼って判定する単体ウォッチ（試作）","display":"standalone","icons":[{"sizes":"192x192","src":"icon-192.png","type":"image/png"},{"sizes":"512x512","src":"icon-512.png","type":"image/png"}],"name":"匂わせウォッチ","scope":"./","short_name":"匂わせウォッチ","start_url":"./index.html","theme_color":"#7c5cbf"}
