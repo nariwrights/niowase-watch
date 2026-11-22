@@ -56,7 +56,7 @@ button.small{padding:7px 13px;font-size:12px}
 <body>
 <div class="wrap">
 <h1>匂わせウォッチ</h1>
-<div class="sub">推し1人の投稿を「貼る／チェックする」→ 文脈を読んで判定する単体ウォッチ。記録はこの端末の中だけに保存されます。文章はキーワードを拾ったあと、仕事・感謝・ファンの文脈で説明できるものを0点に落とします。画像・動画は「本人のものと確認できるか」が必須です。</div>
+<div class="sub">推し1人の投稿を「貼る／チェックする」→ 文脈を読んで判定する単体ウォッチ。記録はこの端末の中だけに保存されます。文章はキーワードを拾ったあと、仕事・感謝・ファンの文脈で説明できるものを0点に落とします。画像は「本人のものと確認できるか」が必須です。</div>
 
 <div class="card">
 <div class="row" id="profiles" style="margin-bottom:8px"></div>
@@ -88,7 +88,7 @@ button.small{padding:7px 13px;font-size:12px}
 <div class="etitle">プラン</div>
 <div class="row" style="margin-top:6px"><span class="kind" id="plan-status">無料プラン</span></div>
 <div class="mini" id="plan-usage" style="margin-top:6px"></div>
-<div class="mini" style="margin-top:6px">有料プラン（月300円・申込は準備中）：判定は無制限、推しは5人まで、履歴は全期間、画像・動画の詳細判定と繰り返し検出がすべて使えます。</div>
+<div class="mini" style="margin-top:6px">有料プラン（月300円・申込は準備中）：判定は無制限、推しは5人まで、履歴は全期間、画像の詳細判定と繰り返し検出がすべて使えます。</div>
 <div id="unlock-box">
 <label>解錠コード（お持ちの方）</label>
 <input type="text" id="unlock-code" placeholder="例：NW-XXXX-0000">
@@ -101,7 +101,6 @@ button.small{padding:7px 13px;font-size:12px}
 <div class="tabs">
 <div class="tab on" data-tab="text">文章</div>
 <div class="tab" data-tab="image">画像</div>
-<div class="tab" data-tab="video">動画</div>
 </div>
 <div id="pane-text">
 <label>日付</label><input type="date" id="t-date">
@@ -122,22 +121,12 @@ button.small{padding:7px 13px;font-size:12px}
 <label style="margin-top:10px"><input type="checkbox" id="i-self"> 写っているのは本人／本人のものと確認できる</label>
 <div class="row" style="margin-top:8px"><button class="primary" id="add-image">画像チェックを追加</button></div>
 </div>
-<div id="pane-video" style="display:none">
-<label>日付</label><input type="date" id="v-date">
-<label>メモ（任意）</label><input type="text" id="v-title" placeholder="例：オフショット動画">
-<div class="checks" id="v-checks"></div>
-<label style="margin-top:10px"><input type="checkbox" id="v-self"> 写っているのは本人／本人のものと確認できる</label>
-<label>セリフ・概要（任意）</label><textarea id="v-text" placeholder="動画内のセリフや状況を書くと文章としても判定する" style="min-height:44px"></textarea>
-<div class="row" style="margin-top:8px"><button class="primary" id="add-video">動画チェックを追加</button></div>
-<div class="mini" style="margin-top:6px">動画は「静止画（サムネイルや場面）＋セリフ」に分解して判定します。</div>
-</div>
-</div>
 
 <div class="card">
 <div class="row">
 <button class="small" id="p1">サンプル1：文脈で消える例</button>
 <button class="small" id="p2">サンプル2：痕跡型</button>
-<button class="small" id="p3">サンプル3：画像・動画</button>
+<button class="small" id="p3">サンプル3：画像</button>
 <button class="small" id="clear">全部消す</button>
 </div>
 <div id="entries" style="margin-top:6px"></div>
@@ -148,7 +137,7 @@ button.small{padding:7px 13px;font-size:12px}
 <textarea id="out" style="margin-top:10px;min-height:110px" placeholder="ここにまとめが出ます"></textarea>
 <div class="mini" style="margin-top:6px">判定はエンタメ診断です。「何も出なかった」は公開範囲で見つからなかったという意味で、絶対の証明ではありません。実在の人の交際を断定するものではありません。</div>
 </div>
-<div class="mini" style="text-align:center;margin-top:4px">匂わせウォッチ v6（新しいデザイン）</div>
+<div class="mini" style="text-align:center;margin-top:4px">匂わせウォッチ v7（動画タブなし）</div>
 </div>
 <script>
 var SIGNS=[
@@ -270,10 +259,10 @@ document.getElementById(id).innerHTML=CHECKS.map(function(c){return '<label clas
 function readChecks(id){var sel={};document.querySelectorAll("#"+id+" input[type=checkbox]").forEach(function(cb){sel[cb.getAttribute("data-k")]=cb.checked;});return sel;}
 function today(){var d=new Date();return d.toISOString().slice(0,10);}
 ["t-date","i-date","v-date"].forEach(function(id){document.getElementById(id).value=today();});
-buildChecks("i-checks");buildChecks("v-checks");
+buildChecks("i-checks");
 document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click",function(){
 document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("on");});t.classList.add("on");
-["text","image","video"].forEach(function(k){document.getElementById("pane-"+k).style.display=(k===t.getAttribute("data-tab"))?"block":"none";});
+["text","image"].forEach(function(k){document.getElementById("pane-"+k).style.display=(k===t.getAttribute("data-tab"))?"block":"none";});
 });});
 document.getElementById("name").addEventListener("change",function(e){P().name=e.target.value;save();});
 document.getElementById("add-text").addEventListener("click",function(){
@@ -319,23 +308,14 @@ var r=scoreChecks(readChecks("i-checks"),document.getElementById("i-self").check
 if(!r.hits.length){alert("チェックを1つ以上入れてください");return;}
 P().entries.push({kind:"image",date:document.getElementById("i-date").value,title:document.getElementById("i-title").value,text:"",hits:r.hits,score:r.score,ts:Date.now(),img:pendingImage||""});clearPendingImage();save();
 });
-document.getElementById("add-video").addEventListener("click",function(){
-var r=scoreChecks(readChecks("v-checks"),document.getElementById("v-self").checked);
-var text=document.getElementById("v-text").value.trim();var th=null,ts=0;
-if(text){th=scoreText(text);ts=th.score;}
-var hits=r.hits.concat(th?th.hits:[]);
-if(!hits.length){alert("チェックかセリフを入れてください");return;}
-P().entries.push({kind:"video",date:document.getElementById("v-date").value,title:document.getElementById("v-title").value,text:text,hits:hits,score:Math.min(100,r.score+ts),ts:Date.now()});save();
-});
 function preset(n){
 if(n===1){P().name=P().name||"推しのA";P().entries=[
 {kind:"text",date:"2026-09-01",title:"サンプル：応援の話（実例をもとにした要約）",text:"オーディションを受けるみなさんへ。緊張したら、友達からもらったお揃いキーホルダーを握ってみて。応援しています！",hits:[],score:0},
 {kind:"text",date:"2026-08-13",title:"サンプル：CMの話（実例をもとにした要約）",text:"マクドナルドのCMに出演させていただきました！ずっと夢だったので本当に幸せです。",hits:[],score:0}];
 P().entries.forEach(function(e){var r=scoreText(e.text);e.hits=r.hits;e.score=r.score;e.ts=Date.now();});}
 if(n===2){P().name=P().name||"推しのA";var t="昨日の夜ごはん。テーブルに二人分の食器を並べて、指輪がキラッと光った気がした。大切な人と過ごす時間は幸せだなあ。";var r=scoreText(t);P().entries=[{kind:"text",date:today(),title:"サンプル：痕跡型",text:t,hits:r.hits,score:r.score,ts:Date.now()}];}
-if(n===3){P().name=P().name||"推しのA";var ri=scoreChecks({two:true,reflect:true},true);var rv=scoreChecks({ring:true},true);var rt=scoreText("休日に出かけた日の動画。大切な人との思い出を少しだけ。");
-P().entries=[{kind:"image",date:today(),title:"サンプル：ブログ写真",text:"",hits:ri.hits,score:ri.score,ts:Date.now()},
-{kind:"video",date:today(),title:"サンプル：オフショット動画",text:"休日に出かけた日の動画",hits:rv.hits.concat(rt.hits),score:Math.min(100,rv.score+rt.score),ts:Date.now()}];}
+if(n===3){P().name=P().name||"推しのA";var ri=scoreChecks({two:true,reflect:true},true);
+P().entries=[{kind:"image",date:today(),title:"サンプル：ブログ写真",text:"",hits:ri.hits,score:ri.score,ts:Date.now()}];}
 save();
 }
 document.getElementById("p1").addEventListener("click",function(){preset(1);});
@@ -446,7 +426,7 @@ function renderPlan(){
 var st=document.getElementById("plan-status");if(!st)return;
 st.textContent=S.premium?"有料プラン（解放済み）":"無料プラン";
 var u=document.getElementById("plan-usage");
-if(u)u.textContent=S.premium?("文章判定：無制限／推し："+S.profiles.length+"人（最大5）／履歴：全期間／画像・動画の詳細：全部表示"):("文章判定：今月 "+usedThisMonth()+" / 10 回／推し：1人まで／履歴：直近7日／画像・動画の詳細：1件まで");
+if(u)u.textContent=S.premium?("文章判定：無制限／推し："+S.profiles.length+"人（最大5）／履歴：全期間／画像の詳細：全部表示"):("文章判定：今月 "+usedThisMonth()+" / 10 回／推し：1人まで／履歴：直近7日／画像の詳細：1件まで");
 var ub=document.getElementById("unlock-box");if(ub)ub.style.display=S.premium?"none":"";
 }
 document.getElementById("unlock-btn").addEventListener("click",function(){
